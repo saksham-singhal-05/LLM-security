@@ -189,7 +189,18 @@ Task is complete when every entry is classified with a validated headcount and e
                 self.result_text.delete(1.0, tk.END)
                 raw_json_str = ""
                 try:
-                    if isinstance(response, str):
+                    # Step 1: Get outer response
+                    if isinstance(response, dict) and "response" in response:
+                        raw = response['response']
+                        # Step 2: Remove 'json'''\ ... ''''
+                        if raw.startswith("json'''") and raw.endswith("'''"):
+                            inner_json = raw[len("json'''"):-3]
+                        else:
+                            inner_json = raw
+                        # Step 3: Parse as real JSON
+                        resp_dict = json.loads(inner_json)
+                        raw_json_str = json.dumps(resp_dict, indent=2)
+                    elif isinstance(response, str):
                         resp_dict = json.loads(response)
                         raw_json_str = json.dumps(resp_dict, indent=2)
                     else:
@@ -202,6 +213,7 @@ Task is complete when every entry is classified with a validated headcount and e
                     category, headcount, reasoning = "unknown", 0, "Invalid response format"
                     raw_json_str = str(response) if response else "Invalid response format"
                 self.result_text.insert(tk.END, raw_json_str)
+
 
                 # Store event to DB
                 store_event(self.conn, category, headcount, reasoning, video_path)
