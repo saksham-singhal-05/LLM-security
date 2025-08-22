@@ -1,0 +1,6 @@
+postgres:
+  host: 'localhost'
+  port: 5432
+  database: 'security'
+  user: 'postgres'
+  password: 'sql@123'
