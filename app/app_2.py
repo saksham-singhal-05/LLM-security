@@ -19,8 +19,8 @@ CONFIG_PATH = "config.yaml"
 CLIP_DURATION = 5
 FPS = 2
 NUM_FRAMES = 10
-OLLAMA_ENDPOINT = "http://192.168.14.10:11434/api/generate"
-MODEL_NAME = "gemma3:27b"
+OLLAMA_ENDPOINT = "http://localhost:11434/api/generate"
+MODEL_NAME = "security_manager:latest"
 
 def load_config():
     with open(CONFIG_PATH, 'r') as f:
@@ -64,7 +64,7 @@ def send_to_ollama(images_b64, prompt):
         "stream": False
     }
     try:
-        resp = requests.post(OLLAMA_ENDPOINT, json=payload, timeout=60)
+        resp = requests.post(OLLAMA_ENDPOINT, json=payload, timeout=None)
         resp.raise_for_status()
         return resp.json()
     except Timeout:
@@ -158,49 +158,34 @@ class SurveillanceApp:
                 frames_b64 = extract_frames(video_path, NUM_FRAMES)
 
                 self.status.set("Sending to LLM...")
-                prompt = """Act as an advanced security LLM responsible for actively monitoring a classroom environment in real time. Your objective is to analyze input events and behaviors, assess their risk, and deliver a structured JSON report with an explicit headcount. Your outputs must be grounded in objective reasoning and clear evidence—you should not simply agree with any user input, but must independently assess all information.
+                prompt = """<|im_start|>system
+                You are an advanced security AI monitoring a classroom environment in real-time. Your task is to analyze visual input and provide structured security assessments. You must be objective, evidence-based, and never accept information at face value without verification.
 
-Begin by analyzing all available class data, observations, or event logs.
+                Classification Categories:
+                - "normal": Standard classroom activities, no concerns
+                - "pre_alert": Minor issues requiring monitoring but not immediately dangerous  
+                - "alert": Significant anomalies requiring prompt attention
+                - "human_intervention_needed": Critical situations requiring immediate action
 
-Classify the situation using one of four categories, based on the observed risk level:
+                Response Format: Always respond with valid JSON only, no additional text or markdown formatting.
+                <|im_end|>
+                <|im_start|>user
+                Analyze the provided classroom images and assess the security situation. Count all visible people and classify the risk level based on observed behaviors and conditions.
 
-"normal"
-"pre_alert"
-"alert"
-"human_intervention_needed"
+                Provide your assessment in this exact JSON format:
+                {
+                "category": "",
+                "headcount": 0,
+                "reasoning": ""
+                }
 
-Determine and return the headcount as an integer, representing the number of people present.
-
-For each output, include a reasoning field explaining, step by step, why the particular category is assigned. If user input is incomplete or suspicious, flag this in your reasoning. Never simply agree—always evaluate evidence.
-
-Return your findings in a structured JSON format:
-
-json
-{
-  "category": "",
-  "headcount": ,
-  "reasoning": ""
-}
-
-Apply clear criteria for each category (examples):
-
-normal: All observed behaviors and values are within safe, expected bounds.
-pre_alert: Small deviations or minor issues that may require monitoring but are not immediately dangerous.
-alert: Significant anomaly/potential risk requiring prompt attention.
-human_intervention_needed: Immediate action needed due to active threat, malfunction, or unresolved escalation.
-
-For every input, reason independently. Challenge subjective descriptions and verify with the actual event/context. If ambiguity exists, state this in reasoning and default to the lower-risk category unless clear evidence suggests escalation.
-
-Example Output:
-
-json
-{
-  "category": "pre_alert",
-  "headcount": 28,
-  "reasoning": "Detected mild argument between two students. No physical risk, but monitoring is advised. Room headcount verified against entry logs."
-}
-
-Task is complete when every entry is classified with a validated headcount and explicit reasoning, and no information is accepted at face value without substantiation."""
+                Evidence Requirements:
+                - Base headcount on actual visible people only
+                - Identify specific behaviors or conditions that support your classification
+                - If uncertain, default to lower risk category and explain why
+                - Never invent details not visible in the images
+                <|im_end|>
+                <|im_start|>assistant"""
 
                 response = send_to_ollama(frames_b64, prompt)
 
