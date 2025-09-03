@@ -5,7 +5,7 @@ import requests
 import os
 
 # === CONFIG ===
-VIDEO_PATH = "captured_clip.mp4"  # Path to your 5-second video
+VIDEO_PATH = "surveillance_clip.mp4"  # Path to your 5-second video
 NUM_FRAMES = 5
 OLLAMA_ENDPOINT = "http://192.168.14.10:11434/api/generate"
 MODEL_NAME = "gemma3:27b"  # Change to a multimodal model like "llava" or your deployed one

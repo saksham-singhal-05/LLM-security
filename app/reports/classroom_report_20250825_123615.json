@@ -1,0 +1,71 @@
+{
+  "metadata": {
+    "generated_at": "2025-08-25T12:36:15.679385",
+    "report_version": "1.0",
+    "data_period": {
+      "start": "2025-08-22T15:15:32.403104",
+      "end": "2025-08-25T12:32:34.506182",
+      "total_days": 2
+    }
+  },
+  "analysis_results": {
+    "executive_summary": "Analysis of 29 events with 6.9% critical alerts",
+    "risk_level": "RiskLevel.MEDIUM",
+    "key_findings": [
+      "Total events monitored: 29",
+      "Critical alert rate: 6.9%",
+      "Peak activity hour: 15:00"
+    ],
+    "recommendations": [
+      "Continue regular monitoring",
+      "Review alert thresholds if needed",
+      "Ensure adequate staffing during peak hours"
+    ],
+    "temporal_patterns": {
+      "peak_times": "Highest activity at hour 15",
+      "concerning_periods": "None identified in basic analysis",
+      "normal_operations": "Standard classroom patterns observed"
+    },
+    "security_insights": "Basic analysis indicates standard operational patterns",
+    "operational_recommendations": [
+      "Maintain current monitoring protocols",
+      "Regular equipment calibration",
+      "Staff training updates"
+    ],
+    "predicted_concerns": [
+      "Monitor for pattern changes",
+      "Watch for equipment degradation"
+    ],
+    "confidence_score": 0.7
+  },
+  "statistics": {
+    "total_events": 29,
+    "category_distribution": {
+      "normal": 27,
+      "alert": 2
+    },
+    "critical_events": 2,
+    "headcount_stats": {
+      "mean": 2.4827586206896552,
+      "median": 3.0,
+      "max": 4,
+      "min": 1,
+      "std": 1.089583460881543
+    },
+    "temporal_analysis": {
+      "peak_hour": 15,
+      "hourly_distribution": {
+        "12": 5,
+        "14": 1,
+        "15": 19,
+        "19": 3,
+        "22": 1
+      },
+      "daily_distribution": {
+        "Friday": 19,
+        "Monday": 5,
+        "Sunday": 5
+      }
+    }
+  }
+}

@@ -3,8 +3,8 @@ import requests
 endpoint = "http://192.168.14.10:11434/api/generate"
 
 payload = {
-    "model": "gemma3:27b",  # make sure this matches your model's exact name
-    "prompt": "why did you flag last request as normal. what do you think was in the video? ",
+    "model": "qwen2.5vl:72b",  # make sure this matches your model's exact name
+    "prompt": "yo bro whats up? ",
     "stream": False
 }
 

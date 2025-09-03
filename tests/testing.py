@@ -1,10 +1,9 @@
 import requests
 import socket
-
-def check_ollama_connection(endpoint="http://192.168.14.10:11434", model="gemma3:27b"):
+url="http://192.168.14.10:11434"
+def check_ollama_connection(endpoint=url, model="gemma3:27b"):
     print(f" Checking Ollama at {endpoint} with model '{model}'\n")
 
-    # Step 1: Check if host/port is reachable
     try:
         host = endpoint.split("//")[-1].split(":")[0]
         port = int(endpoint.split(":")[-1])
@@ -39,9 +38,10 @@ def check_ollama_connection(endpoint="http://192.168.14.10:11434", model="gemma3
         url = f"{endpoint}/api/generate"
         payload = {
             "model": model,
-            "prompt": "Hello Gemma 3 27B, indentify yourself and tell me about your capabilities"
+            "prompt": "la la lalalallaa",
+            "stream": False,
         }
-        r = requests.post(url, json=payload, stream=True, timeout=30)
+        r = requests.post(url, json=payload, stream=True, timeout=None)
         if r.status_code == 200:
             print(" Generate API working. Response:")
             for line in r.iter_lines():

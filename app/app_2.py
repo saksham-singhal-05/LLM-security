@@ -13,13 +13,14 @@ from requests.exceptions import Timeout
 import os
 from datetime import datetime
 import json
+import re
 
 CONFIG_PATH = "config.yaml"
 CLIP_DURATION = 5
 FPS = 2
 NUM_FRAMES = 10
 OLLAMA_ENDPOINT = "http://192.168.14.10:11434/api/generate"
-MODEL_NAME = "gemma3:27b"
+MODEL_NAME = "qwen2.5vl:72b"
 
 def load_config():
     with open(CONFIG_PATH, 'r') as f:
@@ -63,9 +64,9 @@ def send_to_ollama(images_b64, prompt):
         "stream": False
     }
     try:
-        resp = requests.post(OLLAMA_ENDPOINT, json=payload, timeout=60)
+        resp = requests.post(OLLAMA_ENDPOINT, json=payload, timeout=None)
         resp.raise_for_status()
-        return resp.json().get('response', '')
+        return resp.json()
     except Timeout:
         raise Timeout("Connection timed out while contacting the LLM endpoint.")
     except Exception as e:
@@ -109,18 +110,23 @@ class SurveillanceApp:
     def __init__(self, master):
         self.master = master
         self.is_running = False
-        master.title("Simple LLM Surveillance")
+        master.title("LLM Surveillance")
+        
         self.start_btn = ttk.Button(master, text="Start Surveillance", command=self.toggle_surveillance)
         self.start_btn.pack(pady=10)
+        
         self.status = tk.StringVar(value="Idle")
         self.status_lbl = ttk.Label(master, textvariable=self.status)
         self.status_lbl.pack(pady=5)
+        
         self.last_frame_img = None
         self.panel = tk.Label(master)
         self.panel.pack()
-        self.result_text = ScrolledText(master, width=60, height=10, wrap=tk.WORD)
+        
+        # Add ScrolledText widget for displaying full JSON response
+        self.result_text = ScrolledText(master, width=80, height=15, wrap=tk.WORD)
         self.result_text.pack(pady=10)
-
+        
         self.config = load_config()
         self.conn = connect_db(self.config)
         self.surv_thread = None
@@ -152,56 +158,69 @@ class SurveillanceApp:
                 frames_b64 = extract_frames(video_path, NUM_FRAMES)
 
                 self.status.set("Sending to LLM...")
-                prompt = """Act as an advanced security LLM responsible for actively monitoring a classroom environment in real time. Your objective is to analyze input events and behaviors, assess their risk, and deliver a structured JSON report with an explicit headcount. Your outputs must be grounded in objective reasoning and clear evidence—you should not simply agree with any user input, but must independently assess all information.
-Begin by analyzing all available class data, observations, or event logs.
-Classify the situation using one of four categories, based on the observed risk level:
-"normal"
-"pre_alert"
-"alert"
-"human_intervention_needed"
-Determine and return the headcount as an integer, representing the number of people present.
-For each output, include a reasoning field explaining, step by step, why the particular category is assigned. If user input is incomplete or suspicious, flag this in your reasoning. Never simply agree—always evaluate evidence.
-Return your findings in a structured JSON format:
-json
+                prompt = """<|im_start|>system
+                You are an advanced security AI monitoring a classroom environment in real-time. Your task is to analyze visual input and provide structured security assessments. You must be objective, evidence-based, and never accept information at face value without verification.
 
-"category": "",
-"headcount": ,
-"reasoning": ""
+                Classification Categories:
+                - "normal": Standard classroom activities, no concerns
+                - "pre_alert": Minor issues requiring monitoring but not immediately dangerous  
+                - "alert": Significant anomalies requiring prompt attention
+                - "human_intervention_needed": Critical situations requiring immediate action
 
-Apply clear criteria for each category (examples):
-normal: All observed behaviors and values are within safe, expected bounds.
-pre_alert: Small deviations or minor issues that may require monitoring but are not immediately dangerous.
-alert: Significant anomaly/potential risk requiring prompt attention.
-human_intervention_needed: Immediate action needed due to active threat, malfunction, or unresolved escalation.
-For every input, reason independently. Challenge subjective descriptions and verify with the actual event/context. If ambiguity exists, state this in reasoning and default to the lower-risk category unless clear evidence suggests escalation.
-Example Output:
-json
+                Response Format: Always respond with valid JSON only, no additional text or markdown formatting.
+                <|im_end|>
+                <|im_start|>user
+                Analyze the provided classroom images and assess the security situation. Count all visible people and classify the risk level based on observed behaviors and conditions.
 
-"category": "pre_alert",
-"headcount": 28,
-"reasoning": "Detected mild argument between two students. No physical risk, but monitoring is advised. Room headcount verified against entry logs."
+                Provide your assessment in this exact JSON format:
+                {
+                "category": "",
+                "headcount": 0,
+                "reasoning": ""
+                }
 
-Task is complete when every entry is classified with a validated headcount and explicit reasoning, and no information is accepted at face value without substantiation."""
+                Evidence Requirements:
+                - Base headcount on actual visible people only
+                - Identify specific behaviors or conditions that support your classification
+                - If uncertain, default to lower risk category and explain why
+                - Never invent details not visible in the images
+                <|im_end|>
+                <|im_start|>assistant"""
 
                 response = send_to_ollama(frames_b64, prompt)
 
-                # Show full JSON response (with pretty formatting) in Text box
+                # Parse response exactly like video_test.py
                 self.result_text.delete(1.0, tk.END)
-                raw_json_str = ""
+                raw_response = response.get("response", response)
+                
+                # Display the full response in the text widget
+                self.result_text.insert(tk.END, f"Full Response:\n{raw_response}\n\n")
+                
                 try:
-                    if isinstance(response, str):
-                        resp_dict = json.loads(response)
-                        raw_json_str = json.dumps(resp_dict, indent=2)
+                    # Extract JSON from the response (handling ```
+                    if isinstance(raw_response, str):
+                        # Look for JSON block within ```json ```
+                        json_match = re.search(r'```json\s*(\{.*?\})\s*```',raw_response, re.DOTALL)
+                        if json_match:
+                            json_str = json_match.group(1)
+                            resp_dict = json.loads(json_str)
+                        else:
+                            # Try to parse the entire response as JSON
+                            resp_dict = json.loads(raw_response)
                     else:
-                        resp_dict = response
-                        raw_json_str = json.dumps(resp_dict, indent=2)
+                        resp_dict = raw_response
+                    
+                    # Display parsed JSON
+                    formatted_json = json.dumps(resp_dict, indent=2)
+                    self.result_text.insert(tk.END, f"Parsed JSON:\n{formatted_json}")
+                    
                     category = resp_dict.get("category", "unknown")
                     headcount = int(resp_dict.get("headcount", 0))
                     reasoning = resp_dict.get("reasoning", "")
-                except Exception:
-                    category, headcount, reasoning = "unknown", 0, "Invalid response format"
-                    raw_json_str = str(response) if response else "Invalid response format"
-                self.result_text.insert(tk.END, raw_json_str)
+                    
+                except Exception as parse_error:
+                    category, headcount, reasoning = "unknown", 0, f"Parse error: {str(parse_error)}"
+                    self.result_text.insert(tk.END, f"Parse Error: {str(parse_error)}")
 
                 # Store event to DB
                 store_event(self.conn, category, headcount, reasoning, video_path)
@@ -212,10 +231,14 @@ Task is complete when every entry is classified with a validated headcount and e
 
             except Timeout:
                 self.status.set("Error: Connection timed out. Retrying shortly...")
+                self.result_text.delete(1.0, tk.END)
+                self.result_text.insert(tk.END, "Error: Connection timed out")
             except Exception as e:
                 self.status.set(f"Error: {str(e)}. Retrying...")
-            time.sleep(5) # delay before next cycle
-
+                self.result_text.delete(1.0, tk.END)
+                self.result_text.insert(tk.END, f"Error: {str(e)}")
+            
+            time.sleep(0.5) 
 root = tk.Tk()
 app = SurveillanceApp(root)
 root.mainloop()
